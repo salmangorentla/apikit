@@ -1,0 +1,131 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<types:mule xmlns:types="http://www.mulesoft.org/schema/mule/types">
+  <types:catalog>
+    <types:type name="Customer" format="json">
+      <types:shape format="weave" example="examples/customer_example.json"><![CDATA[%dw 2.0
+
+type Customer = {|
+  CompanyName: String, 
+  ContactName: String, 
+  ContactTitle: String, 
+  CustomerID: String
+|} {"example": "{\\\"CompanyName\\\":\\\"Alfreds Futterkiste\\\",\\\"ContactName\\\":\\\"Maria Anders\\\",\\\"ContactTitle\\\":\\\"Sales Representative\\\",\\\"CustomerID\\\":\\\"ALFKI\\\"}"}
+
+]]></types:shape>
+    </types:type>
+    <types:type name="Order" format="json">
+      <types:shape format="weave" example="examples/order_example.json"><![CDATA[%dw 2.0
+
+type Order = {|
+  Freight: Number {"typeId": "double"}, 
+  OrderDate: String, 
+  OrderID: Number {"typeId": "int"}, 
+  Price: Null, 
+  Priority: Number {"typeId": "int"}, 
+  ShipAddress: String, 
+  ShipName: String
+|} {"example": "{\\\"Freight\\\":92.69,\\\"OrderDate\\\":\\\"1996-08-12T00:00:00Z\\\",\\\"OrderID\\\":10278,\\\"Price\\\":null,\\\"Priority\\\":1,\\\"ShipAddress\\\":\\\"Berguvsvgen 8\\\",\\\"ShipName\\\":\\\"Berglunds snabbkp\\\"}"}
+
+]]></types:shape>
+    </types:type>
+  </types:catalog>
+  <types:enrichment select="#9aad873d-8c90-4581-87eb-9e86f6d6a7c3">
+    <types:processor-declaration>
+      <types:output-event>
+        <types:message>
+          <types:payload type="Customer[]"/>
+        </types:message>
+      </types:output-event>
+    </types:processor-declaration>
+  </types:enrichment>
+  <types:enrichment select="#8a192804-0f7a-40e5-b759-6a7ce99ae50b">
+    <types:processor-declaration>
+      <types:output-event>
+        <types:message>
+          <types:payload type="Customer[]"/>
+        </types:message>
+      </types:output-event>
+    </types:processor-declaration>
+  </types:enrichment>
+  <types:enrichment select="#77a58c09-cdfa-4e27-b33a-736ae7c3310e">
+    <types:processor-declaration>
+      <types:output-event>
+        <types:message>
+          <types:payload type="Customer[]"/>
+        </types:message>
+      </types:output-event>
+    </types:processor-declaration>
+  </types:enrichment>
+  <types:enrichment select="#d7463948-41ef-487e-9fda-4f0b72d615f5">
+    <types:processor-declaration>
+      <types:output-event>
+        <types:message>
+          <types:payload type="Customer[]"/>
+        </types:message>
+      </types:output-event>
+    </types:processor-declaration>
+  </types:enrichment>
+  <types:enrichment select="#3f2b6191-aa3e-4295-b9ce-dc4ffffd8b8e">
+    <types:processor-declaration>
+      <types:output-event>
+        <types:message>
+          <types:payload type="Customer[]"/>
+        </types:message>
+      </types:output-event>
+    </types:processor-declaration>
+  </types:enrichment>
+  <types:enrichment select="#9c211564-99e8-43d9-9c28-32ecfb8e3927">
+    <types:processor-declaration>
+      <types:output-event>
+        <types:message>
+          <types:payload type="Order[]"/>
+        </types:message>
+      </types:output-event>
+    </types:processor-declaration>
+  </types:enrichment>
+  <types:enrichment select="#7339e8f3-12f3-4581-bc5c-7ca7b24dce81">
+    <types:processor-declaration>
+      <types:output-event>
+        <types:message>
+          <types:payload type="Order[]"/>
+        </types:message>
+      </types:output-event>
+    </types:processor-declaration>
+  </types:enrichment>
+  <types:enrichment select="#55190eae-8d3b-4d13-b547-fe5b7f4a052b">
+    <types:processor-declaration>
+      <types:output-event>
+        <types:message>
+          <types:payload type="Order[]"/>
+        </types:message>
+      </types:output-event>
+    </types:processor-declaration>
+  </types:enrichment>
+  <types:enrichment select="#80c5b6bf-3c54-446e-9b0f-ff68adc5a420">
+    <types:processor-declaration>
+      <types:output-event>
+        <types:message>
+          <types:payload type="Order[]"/>
+        </types:message>
+      </types:output-event>
+    </types:processor-declaration>
+  </types:enrichment>
+  <types:enrichment select="#c0f18915-1981-45af-8044-ee2f8db45352">
+    <types:processor-declaration>
+      <types:output-event>
+        <types:message>
+          <types:payload type="Order[]"/>
+        </types:message>
+      </types:output-event>
+    </types:processor-declaration>
+  </types:enrichment>
+  <types:enrichment select="#6c9e92ca-8fcb-441e-ae9d-a4b4a9eca49d">
+    <types:processor-declaration>
+      <types:output-event>
+        <types:message>
+          <types:payload type="Order"/>
+        </types:message>
+      </types:output-event>
+    </types:processor-declaration>
+  </types:enrichment>
+</types:mule>

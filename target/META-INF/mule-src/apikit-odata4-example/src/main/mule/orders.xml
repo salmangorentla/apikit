@@ -1,0 +1,374 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:apikit-odata="http://www.mulesoft.org/schema/mule/apikit-odata" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd http://www.mulesoft.org/schema/mule/apikit-odata http://www.mulesoft.org/schema/mule/apikit-odata/current/mule-apikit-odata.xsd http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd 
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd">
+  <apikit-odata:config name="odata-metadata-config" apiDefinition="api/odata-metadata.csdl.xml" />
+  <http:listener-config name="HTTP_Listener_Config">
+    <http:listener-connection host="localhost" port="8081" />
+  </http:listener-config>
+  <configuration-properties doc:name="Configuration properties" doc:id="e4568e23-7f04-4e53-b566-5a6b69df9f64" file="mule-configuration.properties" />
+	<db:config name="Database_Config" doc:name="Database Config" doc:id="c167e0b2-74d9-431a-a9ab-a8b30c04f4c0" >
+		<db:my-sql-connection host="${ds.db.host}" port="${ds.db.port}" user="${ds.db.user}" password="${ds.db.password}" database="${ds.db.database}" />
+	</db:config>
+	<flow name="main-odata-flow">
+    <http:listener config-ref="HTTP_Listener_Config" path="/api/*">
+      <http:response statusCode="#[attributes.statusCode default 200]">
+        <http:headers>#[attributes.headers default {}]</http:headers>
+      </http:response>
+      <http:error-response statusCode="#[vars.statusCode default 500]">
+        <http:body>#[payload]</http:body>
+        <http:headers>#[vars.headers default {}]</http:headers>
+      </http:error-response>
+    </http:listener>
+    <apikit-odata:route config-ref="odata-metadata-config">
+      <apikit-odata:http-request-parameters listenerPath="#[attributes.listenerPath]" method="#[attributes.method]" scheme="#[upper(attributes.scheme)]" host="#[attributes.headers.'host']" httpHeaders="#[attributes.headers]" queryString="#[attributes.queryString]" maskedRequestPath="#[attributes.maskedRequestPath]" />
+    </apikit-odata:route>
+    <error-handler name="Error_Handler">
+      <on-error-propagate name="On_Error_Propagate" enableNotifications="true" logException="true" type="MULE:ANY">
+        <ee:transform>
+          <ee:message>
+            <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+	error: {
+		code: error.errorMessage.payload.code default "UNKNOWN",
+		message: error.errorMessage.payload.message default error.description,
+		target: error.errorMessage.payload.target,
+		details: error.errorMessage.payload.details default [{code: "UNKNOWN", message: error.detailedDescription, target: null}],
+		innererror: error.errorMessage.payload.innerError default error.childErrors
+	}
+}]]></ee:set-payload>
+          </ee:message>
+          <ee:variables>
+            <ee:set-variable variableName="statusCode"><![CDATA[error.errorMessage.payload.statusCode default 500]]></ee:set-variable>
+          </ee:variables>
+        </ee:transform>
+      </on-error-propagate>
+    </error-handler>
+  </flow>
+  <flow name="GET\Customers\ENTITY">
+    <apikit-odata:request-entity-listener config-ref="odata-metadata-config" method="GET" path="/Customers"/>
+		<apikit-odata:transform-to-sql-select doc:name="Transform to sql select" doc:id="cff2bf0d-6e57-4902-9c0e-d15a1490aad7" config-ref="odata-metadata-config" entitySetName="#[attributes.entitySetName]">
+			<apikit-odata:request-parameters entityTypeFields="#[attributes.odataRequestAttributes.entityTypeFields]" entityTypeKeys="#[attributes.odataRequestAttributes.entityTypeKeys]" systemQueryOptions="#[attributes.odataRequestAttributes.systemQueryOptions]" entityTypeName="#[attributes.odataRequestAttributes.entityTypeName]" />
+			<apikit-odata:transformation-parameters strictSearchTermMatch="true" />
+		</apikit-odata:transform-to-sql-select>
+		<db:select doc:name="Select" doc:id="9aad873d-8c90-4581-87eb-9e86f6d6a7c3" config-ref="Database_Config">
+			<db:sql><![CDATA[#[payload]]]></db:sql>
+			<db:input-parameters><![CDATA[#[attributes.queryParameters]]]></db:input-parameters>
+		</db:select>
+		<apikit-odata:serialize-entity config-ref="odata-metadata-config" path="/Customers" method="GET">
+      <apikit-odata:inbound-content><![CDATA[#[%dw 2.0 output application/json --- if (isEmpty(payload)) {} else payload[0]]]]></apikit-odata:inbound-content>
+    </apikit-odata:serialize-entity>
+  </flow>
+  <flow name="POST\Customers\ENTITY">
+    <apikit-odata:request-entity-listener config-ref="odata-metadata-config" path="/Customers" method="POST" />
+		<set-variable value="#[attributes.odataRequestAttributes]" doc:name="Set Variable odataRequestAttributes" doc:id="65517185-f928-4459-8506-4d7fd0a746e2" variableName="odataRequestAttributes"/>
+		<set-variable value="#[attributes.entitySetName]" doc:name="Set Variable entitySetName" doc:id="69f6b56f-59d2-4c52-8e89-59bcc8b3a0e3" variableName="entitySetName" />
+		<set-variable value="#[payload.CustomerID]" doc:name="Set Variable CustomerID" doc:id="f7de6f83-2f19-4490-99a0-f3b721d43239" variableName="customerID"/>
+		<ee:transform doc:name="Transform Message" doc:id="8424f241-67f2-4d9b-8090-158f2367f91a" >
+			<ee:message >
+				<ee:set-payload resource="dataweaves/sql/sql_insert_entity.dwl" />
+			</ee:message>
+		</ee:transform>
+		<db:insert doc:name="Insert" doc:id="bf35aed2-6609-4c77-b5ed-aae2175e4d83" config-ref="Database_Config">
+			<db:sql ><![CDATA[#[payload]]]></db:sql>
+		</db:insert>
+		<apikit-odata:transform-to-sql-select doc:name="Transform to sql select" doc:id="4c7eefa9-f0eb-4da4-8f1a-500d0a3ff35b" config-ref="odata-metadata-config" entitySetName="#[vars.entitySetName]">
+			<apikit-odata:request-parameters entityTypeFields="#[vars.odataRequestAttributes.entityTypeFields]" systemQueryOptions="#[vars.odataRequestAttributes.systemQueryOptions]" entityTypeName="#[vars.odataRequestAttributes.entityTypeName]">
+				<apikit-odata:entity-type-keys >
+					<apikit-odata:entity-type-key key="CustomerID" value="#[&quot;'&quot; ++ vars.customerID as String ++ &quot;'&quot;]" />
+				</apikit-odata:entity-type-keys>
+			</apikit-odata:request-parameters>
+		</apikit-odata:transform-to-sql-select>
+		<db:select doc:name="Select" doc:id="8a192804-0f7a-40e5-b759-6a7ce99ae50b" config-ref="Database_Config">
+			<db:sql ><![CDATA[#[payload]]]></db:sql>
+			<db:input-parameters ><![CDATA[#[attributes.queryParameters]]]></db:input-parameters>
+		</db:select>
+		<apikit-odata:serialize-entity config-ref="odata-metadata-config" path="/Customers" method="POST">
+      <apikit-odata:inbound-content><![CDATA[#[%dw 2.0 output application/json --- if (isEmpty(payload)) {} else payload[0]]]]></apikit-odata:inbound-content>
+    </apikit-odata:serialize-entity>
+  </flow>
+  <flow name="PATCH\Customers\ENTITY">
+    <apikit-odata:request-entity-listener config-ref="odata-metadata-config" path="/Customers" method="PATCH" />
+		<set-variable value="#[attributes.odataRequestAttributes]" doc:name="Set Variable odataRequestAttributes" doc:id="81313857-69a2-409f-bd5f-cd16d5a72a06" variableName="odataRequestAttributes" />
+		<set-variable value="#[attributes.entitySetName]" doc:name="Set Variable entitySetName" doc:id="b4f1fef8-cbf3-4a31-ac74-839c8625f6c5" variableName="entitySetName" />
+		<ee:transform doc:name="Transform Message" doc:id="3f612003-1035-4be0-86b9-ba9d87e3088b" >
+			<ee:message >
+				<ee:set-payload resource="dataweaves/sql/sql_update_entity.dwl" />
+			</ee:message>
+		</ee:transform>
+		<db:update doc:name="Update" doc:id="47e8dfa9-c3e4-483d-a7e9-bd30f33c8f2a" config-ref="Database_Config">
+			<db:sql ><![CDATA[#[payload]]]></db:sql>
+		</db:update>
+		<apikit-odata:transform-to-sql-select doc:name="Transform to sql select" doc:id="65f61ab0-311a-4de8-ba42-56abba0a4004" config-ref="odata-metadata-config" entitySetName="#[vars.entitySetName]">
+			<apikit-odata:request-parameters entityTypeName="#[vars.odataRequestAttributes.entityTypeName]" entityTypeFields="#[vars.odataRequestAttributes.entityTypeFields]" systemQueryOptions="#[vars.odataRequestAttributes.systemQueryOptions]">
+				<apikit-odata:entity-type-keys>
+					<apikit-odata:entity-type-key key="CustomerID" value="#[vars.odataRequestAttributes.entityTypeKeys.CustomerID]" />
+				</apikit-odata:entity-type-keys>
+			</apikit-odata:request-parameters>
+		</apikit-odata:transform-to-sql-select>
+		<db:select doc:name="Select" doc:id="77a58c09-cdfa-4e27-b33a-736ae7c3310e" config-ref="Database_Config">
+			<db:sql><![CDATA[#[payload]]]></db:sql>
+			<db:input-parameters><![CDATA[#[attributes.queryParameters]]]></db:input-parameters>
+		</db:select>
+		<apikit-odata:serialize-entity config-ref="odata-metadata-config" path="/Customers" method="PATCH">
+      <apikit-odata:inbound-content><![CDATA[#[%dw 2.0 output application/json --- if (isEmpty(payload)) {} else payload[0]]]]></apikit-odata:inbound-content>
+    </apikit-odata:serialize-entity>
+  </flow>
+  <flow name="PUT\Customers\ENTITY">
+    <apikit-odata:request-entity-listener config-ref="odata-metadata-config" path="/Customers" method="PUT" />
+    
+			<try doc:name="Try" doc:id="b5dce577-9d02-47cf-8a81-f5b9bb1f094c" transactionalAction="ALWAYS_BEGIN">
+			<set-variable value="#[payload]" doc:name="Set Variable Customer Payload" doc:id="5fe54565-4892-46df-b7c6-b2a5a9d25c84" variableName="customer" />
+			<set-variable value="#[attributes.odataRequestAttributes]" doc:name="Set Variable odataRequestAttributes" doc:id="a3fa18fd-3eb3-4d55-a523-08f7496820fe" variableName="odataRequestAttributes" />
+			<set-variable value="#[attributes.entitySetName]" doc:name="Set Variable entitySetName" doc:id="e2066d38-1ac3-445b-9ed7-17163ddb11a0" variableName="entitySetName" />
+			<ee:transform doc:name="Transform Message" doc:id="47c849fc-f882-4d40-af46-a0f0c969c148">
+				<ee:message>
+					<ee:set-payload resource="dataweaves/sql/sql_delete_entity.dwl" />
+				</ee:message>
+			</ee:transform>
+			<db:delete doc:name="Delete" doc:id="8e9fe96a-f8ff-4e77-bd6d-8c4a29084c2c" config-ref="Database_Config">
+				<db:sql><![CDATA[#[payload]]]></db:sql>
+			</db:delete>
+			<ee:transform doc:name="Restore Customer Payload and Set Name" doc:id="61d39e98-e2c6-4ecf-bb63-18000e0f4b6d">
+				<ee:message>
+					<ee:set-payload><![CDATA[%dw 2.0
+output application/java
+---
+vars.customer]]></ee:set-payload>
+					<ee:set-attributes><![CDATA[%dw 2.0
+output application/java
+---
+{
+	entitySetName: vars.entitySetName
+}]]></ee:set-attributes>
+				</ee:message>
+			</ee:transform>
+			<ee:transform doc:name="Transform Message" doc:id="15f60838-f0cc-4fc3-b470-cb7fe623f85c">
+				<ee:message>
+					<ee:set-payload resource="dataweaves/sql/sql_insert_entity.dwl" />
+				</ee:message>
+			</ee:transform>
+			<db:insert doc:name="Insert" doc:id="a78d0d7e-7c02-4dcd-977c-db04b66cc81c" config-ref="Database_Config">
+				<db:sql><![CDATA[#[payload]]]></db:sql>
+			</db:insert>
+			<apikit-odata:transform-to-sql-select doc:name="Transform to sql select" doc:id="edb2a0b9-06b5-4560-8b88-57b615e2e872" config-ref="odata-metadata-config" entitySetName="#[vars.entitySetName]">
+			<apikit-odata:request-parameters entityTypeName="#[vars.odataRequestAttributes.entityTypeName]" entityTypeFields="#[vars.odataRequestAttributes.entityTypeFields]" systemQueryOptions="#[vars.odataRequestAttributes.systemQueryOptions]">
+				<apikit-odata:entity-type-keys>
+					<apikit-odata:entity-type-key key="CustomerID" value="#[vars.odataRequestAttributes.entityTypeKeys.CustomerID]" />
+				</apikit-odata:entity-type-keys>
+			</apikit-odata:request-parameters>
+		</apikit-odata:transform-to-sql-select>
+			<db:select doc:name="Select" doc:id="d7463948-41ef-487e-9fda-4f0b72d615f5" config-ref="Database_Config">
+			<db:sql><![CDATA[#[payload]]]></db:sql>
+			<db:input-parameters><![CDATA[#[attributes.queryParameters]]]></db:input-parameters>
+		</db:select>
+			<apikit-odata:serialize-entity config-ref="odata-metadata-config" path="/Customers" method="PUT">
+      <apikit-odata:inbound-content><![CDATA[#[%dw 2.0 output application/json --- if (isEmpty(payload)) {} else payload[0]]]]></apikit-odata:inbound-content>
+    </apikit-odata:serialize-entity>
+		</try>
+		
+  </flow>
+  <flow name="DELETE\Customers\ENTITY">
+    <apikit-odata:request-entity-listener config-ref="odata-metadata-config" path="/Customers" method="DELETE" />
+    <ee:transform doc:name="Transform Message" doc:id="bbcc68ae-d7f5-4890-a2ae-01c7ec6c8e7b" >
+			<ee:message >
+				<ee:set-payload resource="dataweaves/sql/sql_delete_entity.dwl" />
+			</ee:message>
+		</ee:transform>
+		<db:delete doc:name="Delete" doc:id="6fd37c7b-f9fe-4182-9c2e-c9251e8d0a84" config-ref="Database_Config">
+			<db:sql ><![CDATA[#[payload]]]></db:sql>
+		</db:delete>
+  </flow>
+  <flow name="GET\Customers\ENTITY_COLLECTION">
+    <apikit-odata:request-entity-collection-listener config-ref="odata-metadata-config" path="/Customers" method="GET" >
+		</apikit-odata:request-entity-collection-listener>
+		<apikit-odata:transform-to-sql-select doc:name="Transform to sql select" doc:id="823e77ff-57c3-488f-ad45-cbb0fca064e3" config-ref="odata-metadata-config" entitySetName="#[attributes.entitySetName]">
+			<apikit-odata:request-parameters entityTypeName="#[attributes.odataRequestAttributes.entityTypeName]" entityTypeFields="#[attributes.odataRequestAttributes.entityTypeFields]" entityTypeKeys="#[attributes.odataRequestAttributes.entityTypeKeys]" systemQueryOptions="#[attributes.odataRequestAttributes.systemQueryOptions]" />
+		</apikit-odata:transform-to-sql-select>
+		<db:select doc:name="Select" doc:id="3f2b6191-aa3e-4295-b9ce-dc4ffffd8b8e" config-ref="Database_Config" >
+			<db:sql ><![CDATA[#[payload]]]></db:sql>
+			<db:input-parameters ><![CDATA[#[attributes.queryParameters]]]></db:input-parameters>
+		</db:select>
+		<apikit-odata:serialize-entity-collection config-ref="odata-metadata-config" path="/Customers" method="GET">
+      <apikit-odata:inbound-content>#[%dw 2.0 output application/json --- { "value": payload }]</apikit-odata:inbound-content>
+    </apikit-odata:serialize-entity-collection>
+  </flow>
+  <flow name="GET\Orders\ENTITY">
+    <apikit-odata:request-entity-listener config-ref="odata-metadata-config" path="/Orders" method="GET" />
+    <apikit-odata:transform-to-sql-select doc:name="Transform to sql select" doc:id="11e5c793-8e82-40ac-8712-3b60a553d712" config-ref="odata-metadata-config" entitySetName="#[attributes.entitySetName]">
+			<apikit-odata:request-parameters entityTypeFields="#[attributes.odataRequestAttributes.entityTypeFields]" entityTypeKeys="#[attributes.odataRequestAttributes.entityTypeKeys]" systemQueryOptions="#[attributes.odataRequestAttributes.systemQueryOptions]" entityTypeName="#[attributes.odataRequestAttributes.entityTypeName]"/>
+		</apikit-odata:transform-to-sql-select>
+		<db:select doc:name="Select" doc:id="9c211564-99e8-43d9-9c28-32ecfb8e3927" config-ref="Database_Config">
+			<db:sql ><![CDATA[#[payload]]]></db:sql>
+			<db:input-parameters ><![CDATA[#[attributes.queryParameters]]]></db:input-parameters>
+		</db:select>
+		<apikit-odata:serialize-entity config-ref="odata-metadata-config" path="/Orders" method="GET">
+      <apikit-odata:inbound-content><![CDATA[#[%dw 2.0 output application/json --- if (isEmpty(payload)) {} else payload[0]]]]></apikit-odata:inbound-content>
+    </apikit-odata:serialize-entity>
+  </flow>
+  <flow name="POST\Orders\ENTITY">
+    <apikit-odata:request-entity-listener config-ref="odata-metadata-config" path="/Orders" method="POST" />
+		<set-variable value="#[attributes.odataRequestAttributes]" doc:name="Set Variable odataRequestAttributes" doc:id="296b85aa-2d05-45cf-a592-34ee645e1399" variableName="odataRequestAttributes" />
+		<set-variable value="#[attributes.entitySetName]" doc:name="Set Variable entitySetName" doc:id="e91b4951-31c2-451f-b02c-632f2c99e64c" variableName="entitySetName" />
+		<set-variable value="#[{OrderID: payload.OrderID, ShipName: payload.ShipName}]" doc:name="Set Variable OrderKey" doc:id="44ed1fc2-dcfc-4e75-82d0-b3c00423b242" variableName="orderKey" />
+		<ee:transform doc:name="Transform Message" doc:id="5d401db2-a9d8-4c45-9538-b33c7641706a">
+			<ee:message>
+				<ee:set-payload resource="dataweaves/sql/sql_insert_entity.dwl" />
+			</ee:message>
+		</ee:transform>
+		<db:insert doc:name="Insert" doc:id="a0b022ca-141d-41bc-9c60-62c4b8a36819" config-ref="Database_Config">
+			<db:sql ><![CDATA[#[payload]]]></db:sql>
+		</db:insert>
+		<apikit-odata:transform-to-sql-select doc:name="Transform to sql select" doc:id="6ea0e306-1594-42de-b68f-0ff1c3d71636" config-ref="odata-metadata-config" entitySetName="#[vars.entitySetName]">
+			<apikit-odata:request-parameters entityTypeName="#[vars.odataRequestAttributes.entityTypeName]" entityTypeFields="#[vars.odataRequestAttributes.entityTypeFields]" systemQueryOptions="#[vars.odataRequestAttributes.systemQueryOptions]">
+				<apikit-odata:entity-type-keys>
+					<apikit-odata:entity-type-key key="OrderID" value="#[vars.orderKey.OrderID]" />
+					<apikit-odata:entity-type-key key="ShipName" value="#[&quot;'&quot; ++ vars.orderKey.ShipName as String ++ &quot;'&quot;]" />
+				</apikit-odata:entity-type-keys>
+			</apikit-odata:request-parameters>
+		</apikit-odata:transform-to-sql-select>
+		<db:select doc:name="Select" doc:id="7339e8f3-12f3-4581-bc5c-7ca7b24dce81" config-ref="Database_Config">
+			<db:sql><![CDATA[#[payload]]]></db:sql>
+			<db:input-parameters><![CDATA[#[attributes.queryParameters]]]></db:input-parameters>
+		</db:select>
+		<apikit-odata:serialize-entity config-ref="odata-metadata-config" path="/Orders" method="POST">
+      <apikit-odata:inbound-content><![CDATA[#[%dw 2.0 output application/json --- if (isEmpty(payload)) {} else payload[0]]]]></apikit-odata:inbound-content>
+    </apikit-odata:serialize-entity>
+  </flow>
+  <flow name="PATCH\Orders\ENTITY">
+    <apikit-odata:request-entity-listener config-ref="odata-metadata-config" path="/Orders" method="PATCH" />
+		<set-variable value="#[attributes.odataRequestAttributes]" doc:name="Set Variable odataRequestAttributes" doc:id="d49de332-927a-4078-bf64-3e53f298d577" variableName="odataRequestAttributes" />
+		<set-variable value="#[attributes.entitySetName]" doc:name="Set Variable entitySetName" doc:id="d9264280-7356-4c0a-b550-6adbbecfc18b" variableName="entitySetName" />
+		<ee:transform doc:name="Transform Message" doc:id="1cc4aaee-adaa-42b1-83e8-7fc32f3a62a4" >
+			<ee:message >
+				<ee:set-payload resource="dataweaves/sql/sql_update_entity.dwl" />
+			</ee:message>
+		</ee:transform>
+		<db:update doc:name="Update" doc:id="290c122d-77fd-4c1f-8c91-d1d80eaceb34" config-ref="Database_Config" >
+			<db:sql ><![CDATA[#[payload]]]></db:sql>
+		</db:update>
+		<apikit-odata:transform-to-sql-select doc:name="Transform to sql select" doc:id="36af44d5-bce3-4669-8b0a-2c12dc9f7522" config-ref="odata-metadata-config" entitySetName="#[vars.entitySetName]" >
+			<apikit-odata:request-parameters entityTypeName="#[vars.odataRequestAttributes.entityTypeName]" entityTypeFields="#[vars.odataRequestAttributes.entityTypeFields]" systemQueryOptions="#[vars.odataRequestAttributes.systemQueryOptions]" >
+				<apikit-odata:entity-type-keys >
+					<apikit-odata:entity-type-key key="OrderID" value="#[vars.odataRequestAttributes.entityTypeKeys.OrderID]" />
+					<apikit-odata:entity-type-key key="ShipName" value="#[vars.odataRequestAttributes.entityTypeKeys.ShipName]" />
+				</apikit-odata:entity-type-keys>
+			</apikit-odata:request-parameters>
+		</apikit-odata:transform-to-sql-select>
+		<db:select doc:name="Select" doc:id="55190eae-8d3b-4d13-b547-fe5b7f4a052b" config-ref="Database_Config" >
+			<db:sql ><![CDATA[#[payload]]]></db:sql>
+			<db:input-parameters ><![CDATA[#[attributes.queryParameters]]]></db:input-parameters>
+		</db:select>
+		<apikit-odata:serialize-entity config-ref="odata-metadata-config" path="/Orders" method="PATCH">
+      <apikit-odata:inbound-content><![CDATA[#[%dw 2.0 output application/json --- if (isEmpty(payload)) {} else payload[0]]]]></apikit-odata:inbound-content>
+    </apikit-odata:serialize-entity>
+  </flow>
+  <flow name="PUT\Orders\ENTITY">
+    <apikit-odata:request-entity-listener config-ref="odata-metadata-config" path="/Orders" method="PUT" />
+		<try doc:name="Try" doc:id="1f1a64d8-f5a6-4165-813f-8e9e3b7edafc" transactionalAction="ALWAYS_BEGIN" >
+			<set-variable value="#[payload]" doc:name="Set Variable Order Payload" doc:id="60fe447e-a756-4030-bf96-7672faad0409" variableName="order" />
+			<set-variable value="#[attributes.odataRequestAttributes]" doc:name="Set Variable odataRequestAttributes" doc:id="bb1e44f2-1d95-4a57-8c3c-d47bfeb04efb" variableName="odataRequestAttributes" />
+			<set-variable value="#[attributes.entitySetName]" doc:name="Set Variable entitySetName" doc:id="407eaf0d-f144-4869-b9ad-d27efc781bd4" variableName="entitySetName" />
+			<ee:transform doc:name="Transform Message" doc:id="84ad316d-2c42-4c9e-83d0-d9d98b990165" >
+				<ee:message >
+					<ee:set-payload resource="dataweaves/sql/sql_delete_entity.dwl" />
+				</ee:message>
+			</ee:transform>
+			<db:delete doc:name="Delete" doc:id="b74bfad7-0eb5-4523-9955-228b80c9fb2c" config-ref="Database_Config" >
+				<db:sql ><![CDATA[#[payload]]]></db:sql>
+			</db:delete>
+			<ee:transform doc:name="Restore Order Payload and Set Name" doc:id="cfb7b583-474b-44f8-b8b1-f2241cff53ee" >
+				<ee:message >
+					<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+vars.order]]></ee:set-payload>
+					<ee:set-attributes ><![CDATA[%dw 2.0
+output application/java
+---
+{
+	entitySetName: vars.entitySetName
+}]]></ee:set-attributes>
+				</ee:message>
+			</ee:transform>
+			<ee:transform doc:name="Transform Message" doc:id="c750f09c-560f-4fd2-8cde-70c42a3a80ab" >
+				<ee:message >
+					<ee:set-payload resource="dataweaves/sql/sql_insert_entity.dwl" />
+				</ee:message>
+			</ee:transform>
+			<db:insert doc:name="Insert" doc:id="f7964945-4a99-4c64-9d57-25057f7d5c0c" config-ref="Database_Config" >
+				<db:sql ><![CDATA[#[payload]]]></db:sql>
+			</db:insert>
+			<apikit-odata:transform-to-sql-select doc:name="Transform to sql select" doc:id="c986a762-d828-475b-a26b-54c27fec6618" config-ref="odata-metadata-config" entitySetName="#[vars.entitySetName]" >
+				<apikit-odata:request-parameters entityTypeName="#[vars.odataRequestAttributes.entityTypeName]" entityTypeFields="#[vars.odataRequestAttributes.entityTypeFields]" systemQueryOptions="#[vars.odataRequestAttributes.systemQueryOptions]" >
+					<apikit-odata:entity-type-keys >
+						<apikit-odata:entity-type-key key="OrderID" value="#[vars.odataRequestAttributes.entityTypeKeys.OrderID]" />
+						<apikit-odata:entity-type-key key="ShipName" value="#[vars.odataRequestAttributes.entityTypeKeys.ShipName]" />
+					</apikit-odata:entity-type-keys>
+				</apikit-odata:request-parameters>
+			</apikit-odata:transform-to-sql-select>
+			<db:select doc:name="Select" doc:id="80c5b6bf-3c54-446e-9b0f-ff68adc5a420" config-ref="Database_Config" >
+				<db:sql ><![CDATA[#[payload]]]></db:sql>
+				<db:input-parameters ><![CDATA[#[attributes.queryParameters]]]></db:input-parameters>
+			</db:select>
+			<apikit-odata:serialize-entity method="PUT" path="/Orders" doc:name="Serialize entity" doc:id="8ec04b98-5494-45a3-bf5a-9857a8d0c2a8" config-ref="odata-metadata-config" >
+				<apikit-odata:inbound-content ><![CDATA[#[%dw 2.0 output application/json --- if (isEmpty(payload)) {} else payload[0]]]]></apikit-odata:inbound-content>
+			</apikit-odata:serialize-entity>
+		</try>
+  </flow>
+  <flow name="DELETE\Orders\ENTITY">
+    <apikit-odata:request-entity-listener config-ref="odata-metadata-config" path="/Orders" method="DELETE" />
+		<ee:transform doc:name="Transform Message" doc:id="314362e0-73fd-480b-adc9-d7863cd0dc01">
+			<ee:message>
+				<ee:set-payload resource="dataweaves/sql/sql_delete_entity.dwl" />
+			</ee:message>
+		</ee:transform>
+		<db:delete doc:name="Delete" doc:id="a3e4a5af-8354-4db7-9b01-bd7158e468bc" config-ref="Database_Config">
+			<db:sql ><![CDATA[#[payload]]]></db:sql>
+		</db:delete>
+  </flow>
+  <flow name="GET\Orders\ENTITY_COLLECTION">
+    <apikit-odata:request-entity-collection-listener config-ref="odata-metadata-config" path="/Orders" method="GET" >
+			<apikit-odata:collection-success-response >
+				<apikit-odata:entity-collection-success-response count="#[vars.ordersCount]" pageSize="${service.orders.pageSize}"/>
+			</apikit-odata:collection-success-response>
+		</apikit-odata:request-entity-collection-listener>
+		<set-variable value="#[attributes.entitySetName]" doc:name="Set Variable entitySetName" doc:id="d1ed0deb-7fc6-49d8-9d60-9adef7cdbbda" variableName="entitySetName" />
+		<apikit-odata:transform-to-sql-select doc:name="Transform to sql select" doc:id="e4adaaa1-9866-43c8-890b-626e781380c7" config-ref="odata-metadata-config" entitySetName="#[vars.entitySetName]" pageSize="${service.orders.pageSize}">
+			<apikit-odata:request-parameters entityTypeFields="#[attributes.odataRequestAttributes.entityTypeFields]" entityTypeKeys="#[attributes.odataRequestAttributes.entityTypeKeys]" systemQueryOptions="#[attributes.odataRequestAttributes.systemQueryOptions]" entityTypeName="#[attributes.odataRequestAttributes.entityTypeName]"/>
+		</apikit-odata:transform-to-sql-select>
+		<set-variable value="#[attributes.queryParameters]" doc:name="Set Variable queryParameters" doc:id="cfcaea82-9a77-4f8b-827a-e84cad77bfbb" variableName="queryParameters"/>
+		<set-variable value="#[%dw 2.0&#10;import substringAfter,substringBefore from dw::core::Strings&#10;output text/plain&#10;---&#10;substringBefore(substringAfter(payload,'FROM'),'LIMIT')]" doc:name="Set Variable fromWhereClause" doc:id="7c000cb8-5059-438d-8af8-93c8f1becdbe" variableName="fromWhereClause"/>
+		<db:select doc:name="Select Orders" doc:id="c0f18915-1981-45af-8044-ee2f8db45352" config-ref="Database_Config">
+			<db:sql ><![CDATA[#[payload]]]></db:sql>
+			<db:input-parameters ><![CDATA[#[attributes.queryParameters]]]></db:input-parameters>
+		</db:select>
+		<set-variable value="#[payload]" doc:name="Set Variable Orders" doc:id="a464b15f-7324-47f5-836f-f9cb7a70e8b8" variableName="orders"/>
+		<db:select doc:name="Select Orders Count" doc:id="2c06cefd-b932-4025-bf35-dd4e6310678b" config-ref="Database_Config">
+			<db:sql><![CDATA[#[%dw 2.0 
+output text/plain
+---
+'SELECT count(*) FROM ' ++ if (isBlank(vars.fromWhereClause)) "" else (vars.fromWhereClause)]]]></db:sql>
+			<db:input-parameters ><![CDATA[#[vars.queryParameters]]]></db:input-parameters>
+		</db:select>
+		<set-variable value="#[payload[0].'count(*)']" doc:name="Set Variable ordersCount" doc:id="c5e7248f-4006-4416-9479-66ca076397c5" variableName="ordersCount"/>
+		<set-payload value="#[vars.orders]" doc:name="Set Payload Orders" doc:id="fb94208b-7405-4c15-bc15-d80c1823f00f" />
+		<apikit-odata:serialize-entity-collection config-ref="odata-metadata-config" path="/Orders" method="GET">
+      <apikit-odata:inbound-content>#[%dw 2.0 output application/json --- { "value": payload }]</apikit-odata:inbound-content>
+    </apikit-odata:serialize-entity-collection>
+  </flow>
+	<flow name="GET\Customers\Orders\ENTITY_COLLECTION" doc:id="169086b4-4731-4cf9-9da4-375b35cbdb86" >
+		<apikit-odata:request-entity-collection-listener method="GET" path="/Customers/Orders" doc:name="On Entity Collection Request" doc:id="fcdfc89e-2323-44d4-a37e-fd866d83ba6c" config-ref="odata-metadata-config"/>
+		<apikit-odata:transform-to-sql-select doc:name="Transform to sql select" doc:id="642b14e3-5cd6-4f62-b776-15c881c85a14" config-ref="odata-metadata-config" entitySetName="#[attributes.entitySetName]">
+			<apikit-odata:request-parameters entityTypeFields="#[attributes.odataRequestAttributes.entityTypeFields]" entityTypeKeys="#[attributes.odataRequestAttributes.entityTypeKeys]" systemQueryOptions="#[attributes.odataRequestAttributes.systemQueryOptions]" entityTypeName="#[attributes.odataRequestAttributes.entityTypeName]"/>
+		</apikit-odata:transform-to-sql-select>
+		<db:select doc:name="Select Customers' Orders" doc:id="6c9e92ca-8fcb-441e-ae9d-a4b4a9eca49d" config-ref="Database_Config">
+			<db:sql ><![CDATA[#[payload]]]></db:sql>
+			<db:input-parameters ><![CDATA[#[attributes.queryParameters]]]></db:input-parameters>
+		</db:select>
+		<apikit-odata:serialize-entity-collection method="GET" path="/Customers/Orders" doc:name="Serialize entity collection" doc:id="c8881566-e4ed-4fde-ac23-4d1ff62fb8b8" config-ref="odata-metadata-config">
+			<apikit-odata:inbound-content ><![CDATA[#[%dw 2.0 output application/json --- { "value": payload }]]]></apikit-odata:inbound-content>
+		</apikit-odata:serialize-entity-collection>
+	</flow>
+</mule>

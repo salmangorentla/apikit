@@ -1,0 +1,33 @@
+{
+  "configs": [
+    "orders.xml"
+  ],
+  "secureProperties": [],
+  "redeploymentEnabled": true,
+  "name": "com.mycompany:apikit-odata4-example:1.0.0-SNAPSHOT",
+  "minMuleVersion": "4.3.0",
+  "requiredProduct": "MULE_EE",
+  "classLoaderModelLoaderDescriptor": {
+    "id": "mule",
+    "attributes": {
+      "exportedPackages": [],
+      "exportedResources": [
+        "api/odata-metadata.csdl.xml",
+        "application-types.xml",
+        "dataweaves/sql/sql_delete_entity.dwl",
+        "dataweaves/sql/sql_insert_entity.dwl",
+        "dataweaves/sql/sql_update_entity.dwl",
+        "example.sql",
+        "examples/customer_example.json",
+        "examples/order_example.json",
+        "log4j2.xml",
+        "mule-configuration.properties",
+        "orders.xml"
+      ]
+    }
+  },
+  "bundleDescriptorLoader": {
+    "id": "mule",
+    "attributes": {}
+  }
+}
