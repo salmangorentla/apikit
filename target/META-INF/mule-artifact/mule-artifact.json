@@ -14,6 +14,7 @@
       "exportedResources": [
         "api/odata-metadata.csdl.xml",
         "application-types.xml",
+        "config.yam",
         "dataweaves/sql/sql_delete_entity.dwl",
         "dataweaves/sql/sql_insert_entity.dwl",
         "dataweaves/sql/sql_update_entity.dwl",

@@ -1,0 +1,9 @@
+mule:
+	muleVersion: "4.4.0"
+	username: "haniya"
+	password: "Kushi@353"
+	applicationName: "apikit"
+	environment: "Sandbox"
+	workers: "1"
+	workerType: "Micro"
+	

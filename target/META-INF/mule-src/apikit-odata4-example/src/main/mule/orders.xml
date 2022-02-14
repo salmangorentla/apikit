@@ -9,6 +9,7 @@ http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/cu
 	<db:config name="Database_Config" doc:name="Database Config" doc:id="c167e0b2-74d9-431a-a9ab-a8b30c04f4c0" >
 		<db:my-sql-connection host="${ds.db.host}" port="${ds.db.port}" user="${ds.db.user}" password="${ds.db.password}" database="${ds.db.database}" />
 	</db:config>
+	<configuration-properties doc:name="Configuration properties" doc:id="3b8d9fca-99e0-4cbf-99d2-fbeb3bf502bb" file="config.yam" />
 	<flow name="main-odata-flow">
     <http:listener config-ref="HTTP_Listener_Config" path="/api/*">
       <http:response statusCode="#[attributes.statusCode default 200]">

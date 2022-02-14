@@ -5,10 +5,11 @@ http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/cu
   <http:listener-config name="HTTP_Listener_Config">
     <http:listener-connection host="localhost" port="8081" />
   </http:listener-config>
-  <configuration-properties doc:name="Configuration properties" doc:id="e4568e23-7f04-4e53-b566-5a6b69df9f64" file="mule-configuration.properties" />
+  <configuration-properties doc:name="Configuration properties" doc:id="e4568e23-7f04-4e53-b566-5a6b69df9f64" file="config.yam" />
 	<db:config name="Database_Config" doc:name="Database Config" doc:id="c167e0b2-74d9-431a-a9ab-a8b30c04f4c0" >
 		<db:my-sql-connection host="${ds.db.host}" port="${ds.db.port}" user="${ds.db.user}" password="${ds.db.password}" database="${ds.db.database}" />
 	</db:config>
+	
 	<flow name="main-odata-flow">
     <http:listener config-ref="HTTP_Listener_Config" path="/api/*">
       <http:response statusCode="#[attributes.statusCode default 200]">
